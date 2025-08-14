@@ -1,62 +1,62 @@
 version: "3.5"
 services:
   postgresql:
-    container_name: temporal-postgresql
-    environment:
-      POSTGRES_PASSWORD: temporal
-      POSTGRES_USER: temporal
     image: postgres:${POSTGRESQL_VERSION}
     networks:
       - temporal-network
-    ports:
-      - 5432:5432
-    volumes:
-      - /var/lib/postgresql/data
-  temporal:
-    container_name: temporal
-    depends_on:
-      - postgresql
     environment:
-      - DB=postgres12
-      - DB_PORT=5432
       - POSTGRES_USER=temporal
-      - POSTGRES_PWD=temporal
-      - POSTGRES_SEEDS=postgresql
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CLI_ADDRESS=temporal:7233
+      - POSTGRES_PASSWORD=temporal
+    ports:
+      - "5432:5432"
+    volumes:
+      # Use a named volume for persistent data
+      - postgres-data:/var/lib/postgresql/data
+
+  temporal:
     image: temporalio/auto-setup:${TEMPORAL_VERSION}
     networks:
       - temporal-network
     ports:
-      - 7233:7233
-    volumes:
-      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
-  temporal-admin-tools:
-    container_name: temporal-admin-tools
-    depends_on:
-      - temporal
+      - "7233:7233"
     environment:
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CLI_ADDRESS=temporal:7233
-    image: temporalio/admin-tools:${TEMPORAL_ADMINTOOLS_VERSION}
-    networks:
-      - temporal-network
-    stdin_open: true
-    tty: true
+      # Corrected connection details
+      - DB=postgresql
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_DB=temporal
+    depends_on:
+      - postgresql
+
   temporal-ui:
-    container_name: temporal-ui
-    depends_on:
-      - temporal
-    environment:
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
     image: temporalio/ui:${TEMPORAL_UI_VERSION}
     networks:
       - temporal-network
     ports:
-      - 8088:8080
+      # Changed to a non-conflicting port
+      - "8088:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+
+  temporal-admin-tools:
+    image: temporalio/admin-tools:${TEMPORAL_ADMINTOOLS_VERSION}
+    networks:
+      - temporal-network
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    stdin_open: true
+    tty: true
+    depends_on:
+      - temporal
+
+# Define the network and the named volume
 networks:
   temporal-network:
     driver: bridge
-    name: temporal-network
+
+volumes:
+  postgres-data:
+    driver: local
